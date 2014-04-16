@@ -32,6 +32,10 @@
 int blktap_ring_major;
 static struct cdev blktap_ring_cdev;
 
+#ifndef VM_RESERVED
+# define VM_RESERVED (VM_DONTEXPAND | VM_DONTDUMP)
+#endif
+
  /* 
   * BLKTAP - immediately before the mmap area,
   * we have a bunch of pages reserved for shared memory rings.
@@ -203,7 +207,7 @@ blktap_ring_map_request(struct blktap *tap, struct file *filp,
 
 	pgoff = 1 + request->usr_idx * BLKTAP_SEGMENT_MAX;
 
-	addr = do_mmap_pgoff(filp, addr, len, prot, flags, pgoff);
+	addr = vm_mmap(filp, addr, len, prot, flags, pgoff);
 
 	return IS_ERR_VALUE(addr) ? addr : 0;
 }
@@ -223,7 +227,7 @@ blktap_ring_unmap_request(struct blktap *tap,
 	addr  = MMAP_VADDR(ring->user_vstart, request->usr_idx, 0);
 	len   = request->nr_pages << PAGE_SHIFT;
 
-	err = do_munmap(current->mm, addr, len);
+	err = vm_munmap(addr, len);
 	WARN_ON_ONCE(err);
 }
 
@@ -303,7 +307,7 @@ blktap_ring_make_tr_request(struct blktap *tap,
 	unsigned int nsecs;
 
 	breq->u.tr.nr_sectors    = nsecs = bio_sectors(bio);
-	breq->u.tr.sector_number = bio->bi_sector;
+	breq->u.tr.sector_number = bio->bi_iter.bi_sector;
 
 	return nsecs;
 }
